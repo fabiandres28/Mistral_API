@@ -246,7 +246,7 @@
       const formData = new FormData();
       filesArray.forEach(file => formData.append('files', file));
 
-      fetch('http://localhost:8000/upload_files', {
+      fetch('http://localhost:80/upload_files', {
         method: 'POST',
         body: formData
       })
