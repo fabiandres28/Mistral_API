@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR Uploader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    header {
+      background-color: #3d0066;
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+    }
+
+    .logo {
+      font-weight: 600;
+      font-size: 1.25rem;
+    }
+
+    .nav-links li {
+      display: inline;
+      margin-left: 1.5rem;
+      font-weight: 500;
+      color: #e0e0e0;
+      cursor: pointer;
+    }
+
+    main {
+      max-width: 700px;
+      margin: 3rem auto;
+      background-color: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.75rem;
+    }
+
+    .description {
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #666;
+    }
+
+    .drop-area {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      background-color: #fafafa;
+      transition: background-color 0.3s ease;
+    }
+
+    .drop-area.hover {
+      background-color: #e6f7ff;
+    }
+
+    .drop-area img {
+      max-width: 100%;
+      margin-top: 1rem;
+      border-radius: 4px;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      background-color: #1a73e8;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #1558b0;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .loader {
+      margin: 1rem auto;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1a73e8;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .output {
+      margin-top: 2rem;
+    }
+
+    .markdown-output {
+      background: #f9f9f9;
+      border-left: 4px solid #1a73e8;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .json-output {
+      background: #f9f9f9;
+      border-left: 4px solid #1a73e8;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">KOGNIA OCR</div>
+    <ul class="nav-links">
+      <li>Inicio</li>
+      <li>Contacto</li>
+    </ul>
+  </header>
+
+  <main>
+    <h1>Sube tus archivos</h1>
+    <p class="description">Arrastra tus imágenes o PDFs al área o haz clic para seleccionar.</p>
+
+    <div id="drop-area" class="drop-area">
+      <p>Arrastra archivos aquí o haz clic para seleccionar</p>
+      <label for="fileElem" style="color: #1a73e8; cursor: pointer;">Seleccionar archivos</label>
+      <input type="file" id="fileElem" class="file-input" multiple accept="image/*,application/pdf">
+      <div id="preview"></div>
+    </div>
+
+    <div class="actions">
+      <button id="uploadBtn">Procesar</button>
+      <button id="clearBtn">Limpiar</button>
+    </div>
+
+    <div class="loader" id="loader"></div>
+    <div class="output" id="output"></div>
+  </main>
+
+  <script>
+    const dropArea = document.getElementById('drop-area');
+    const fileElem = document.getElementById('fileElem');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const loader = document.getElementById('loader');
+    const output = document.getElementById('output');
+    const preview = document.getElementById('preview');
+
+    let filesArray = [];
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropArea.addEventListener(evt, e => {
+        e.preventDefault();
+        dropArea.classList.add('hover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropArea.addEventListener(evt, e => {
+        e.preventDefault();
+        dropArea.classList.remove('hover');
+      });
+    });
+
+    dropArea.addEventListener('drop', e => {
+      filesArray = Array.from(e.dataTransfer.files);
+      showPreview(filesArray[0]);
+    });
+
+    fileElem.addEventListener('change', () => {
+      filesArray = Array.from(fileElem.files);
+      showPreview(filesArray[0]);
+    });
+
+    function showPreview(file) {
+      preview.innerHTML = '';
+      if (!file) return;
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type === 'application/pdf') {
+        preview.innerHTML = '<p style="color: #666; margin-top: 1rem;">📄 Archivo PDF seleccionado</p>';
+      }
+    }
+
+    uploadBtn.addEventListener('click', () => {
+      if (filesArray.length === 0) return alert('Selecciona un archivo primero.');
+
+      loader.style.display = 'block';
+      output.innerHTML = '';
+
+      const formData = new FormData();
+      filesArray.forEach(file => formData.append('files', file));
+
+      fetch('http://localhost:8000/upload_files', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.headers.get("content-type").includes("application/json") ? res.json() : res.text())
+      .then(result => {
+        loader.style.display = 'none';
+        if (typeof result === 'object' && result.archivos_procesados) {
+          renderStructuredOutput(result.archivos_procesados);
+        } else if (typeof result === 'string') {
+          output.innerHTML = `<div class="markdown-output">${marked.parse(result)}</div>`;
+        } else {
+          output.textContent = result;
+        }
+      })
+      .catch(err => {
+        loader.style.display = 'none';
+        output.textContent = 'Error: ' + err;
+      });
+    });
+
+    clearBtn.addEventListener('click', () => {
+      filesArray = [];
+      fileElem.value = "";
+      preview.innerHTML = '';
+      output.innerHTML = '';
+    });
+
+    function renderStructuredOutput(data) {
+      output.innerHTML = '<h3>Resultados:</h3>';
+      data.forEach(item => {
+        const container = document.createElement('div');
+
+        if (item.ocr_markdown) {
+          const markdown = document.createElement('div');
+          markdown.className = 'markdown-output';
+          markdown.innerHTML = marked.parse(item.ocr_markdown);
+          container.appendChild(markdown);
+        } else if (item.ocr_result) {
+          const json = document.createElement('pre');
+          json.className = 'json-output';
+          json.textContent = JSON.stringify(item.ocr_result, null, 2);
+          container.appendChild(json);
+        }
+
+        output.appendChild(container);
+      });
+    }
+  </script>
+</body>
+</html>
