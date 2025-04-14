@@ -194,6 +194,7 @@
     const loader = document.getElementById('loader');
     const output = document.getElementById('output');
     const preview = document.getElementById('preview');
+    const API_URL = '';
 
     let filesArray = [];
 
@@ -246,7 +247,7 @@
       const formData = new FormData();
       filesArray.forEach(file => formData.append('files', file));
 
-      fetch('http://localhost:8000/upload_files', {
+      fetch(`https://mistral-api-dun.vercel.app/upload_files`, {
         method: 'POST',
         body: formData
       })
